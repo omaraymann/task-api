@@ -3,16 +3,18 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Task API", version="1.0")
 
-tasks = [
+SEED_TASKS = [
     {"id": 1, "title": "Learn FastAPI basics", "done": True},
     {"id": 2, "title": "Build the CRUD endpoints", "done": False},
     {"id": 3, "title": "Publish repo to GitHub", "done": False},
 ]
 
+tasks = [dict(t) for t in SEED_TASKS]
+
 @app.get("/")
 def read_root():
     """Describe the API: name, version, and available endpoints."""
-    return {"name": "Task API", "version": "1.0", "endpoints":["/tasks"]}
+    return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks", "/stats", "/reset"]}
 
 @app.get("/health")
 def health():
@@ -20,8 +22,26 @@ def health():
     return {"status": "ok"}
 
 @app.get("/tasks")
-def get_tasks():
-    """Return the full list of tasks."""
+def get_tasks(done: bool | None = None, search: str | None = None):
+    """Return the list of tasks. Optional filters: ?done=true|false and ?search=word (matches the title)."""
+    result = tasks
+    if done is not None:
+        result = [t for t in result if t["done"] == done]
+    if search is not None and search.strip():
+        result = [t for t in result if search.strip().lower() in t["title"].lower()]
+    return result
+
+@app.get("/stats")
+def get_stats():
+    """Compute task counts: total, done, and open."""
+    done_count = sum(1 for t in tasks if t["done"])
+    return {"total": len(tasks), "done": done_count, "open": len(tasks) - done_count}
+
+@app.post("/reset")
+def reset_tasks():
+    """Restore the three seed tasks. Handy for demos."""
+    tasks.clear()
+    tasks.extend(dict(t) for t in SEED_TASKS)
     return tasks
 
 @app.get("/tasks/{task_id}")

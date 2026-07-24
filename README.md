@@ -23,11 +23,13 @@ The API is now at **http://localhost:8000** and the interactive Swagger docs at 
 |--------|------|--------------|--------------|
 | GET | `/` | Describe the API (name, version, endpoints) | 200 |
 | GET | `/health` | Check the server is alive | 200 |
-| GET | `/tasks` | List all tasks | 200 |
+| GET | `/tasks` | List all tasks — optional filters `?done=true|false` and `?search=word` | 200 |
 | GET | `/tasks/{id}` | Get one task by id | 200 · 404 unknown id |
 | POST | `/tasks` | Create a task from `{"title": "..."}` — server assigns `id`, sets `done: false` | 201 · 400 missing/empty title |
 | PUT | `/tasks/{id}` | Update a task's `title` and/or `done` | 200 · 400 invalid body · 404 unknown id |
 | DELETE | `/tasks/{id}` | Delete a task (empty response body) | 204 · 404 unknown id |
+| GET | `/stats` | Task counts: `{"total": ..., "done": ..., "open": ...}` | 200 |
+| POST | `/reset` | Restore the three seed tasks | 200 |
 
 All errors return JSON in the shape `{"error": "..."}`.
 
@@ -56,6 +58,10 @@ content-type: application/json
 
 {"error":"Task 99 not found"}
 ```
+
+## The mortality experiment
+
+I created a few tasks, restarted the server, and `GET /tasks` showed only the three seed tasks again — everything I had created was gone. That happens because the tasks live in a Python list in the process's memory, and memory is wiped when the process stops; a database exists to solve exactly this, which is what Week 3 is about.
 
 ## Swagger UI
 
