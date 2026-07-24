@@ -27,3 +27,17 @@ def get_task(task_id: int):
     if task is None:
             return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
     return task
+
+@app.post("/tasks", status_code=201)
+def create_task(task: dict):
+    title = task.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return JSONResponse(status_code=400, content={"error": "title is required and must be a non-empty string"})
+
+    new_task = {
+        "id": max((t["id"] for t in tasks), default=0) + 1,
+        "title": title.strip(),
+        "done": False,
+    }
+    tasks.append(new_task)
+    return new_task
