@@ -41,3 +41,27 @@ def create_task(task: dict):
     }
     tasks.append(new_task)
     return new_task
+
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, body: dict):
+    task = next((t for t in tasks if t["id"] == task_id), None)
+    if task is None:
+        return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
+    if "title" not in body and "done" not in body:
+        return JSONResponse(status_code=400, content={"error": "body must contain title and/or done"})
+    if "title" in body and (not isinstance(body["title"], str) or not body["title"].strip()):
+        return JSONResponse(status_code=400, content={"error": "title must be a non-empty string"})
+    if "done" in body and not isinstance(body["done"], bool):
+        return JSONResponse(status_code=400, content={"error": "done must be true or false"})
+    if "title" in body:
+        task["title"] = body["title"].strip()
+    if "done" in body:
+        task["done"] = body["done"]
+    return task
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int):
+    task = next((t for t in tasks if t["id"] == task_id), None)
+    if task is None:
+        return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
+    tasks.remove(task)
