@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from db import get_connection, init_db
+
 app = FastAPI(title="Task API", version="1.0")
+
+init_db()  # creates tasks.db and the tasks table on first run, seeds 3 tasks only when empty
 
 SEED_TASKS = [
     {"id": 1, "title": "Learn FastAPI basics", "done": True},
@@ -10,6 +14,10 @@ SEED_TASKS = [
 ]
 
 tasks = [dict(t) for t in SEED_TASKS]
+
+def row_to_task(row):
+    """Convert a sqlite3.Row into the task dict the API has always returned (done as a real bool, not 0/1)."""
+    return {"id": row["id"], "title": row["title"], "done": bool(row["done"])}
 
 @app.get("/")
 def read_root():
@@ -24,7 +32,12 @@ def health():
 @app.get("/tasks")
 def get_tasks(done: bool | None = None, search: str | None = None):
     """Return the list of tasks. Optional filters: ?done=true|false and ?search=word (matches the title)."""
-    result = tasks
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM tasks").fetchall()
+    finally:
+        conn.close()
+    result = [row_to_task(r) for r in rows]
     if done is not None:
         result = [t for t in result if t["done"] == done]
     if search is not None and search.strip():
@@ -47,10 +60,14 @@ def reset_tasks():
 @app.get("/tasks/{task_id}")
 def get_task(task_id: int):
     """Return one task by id. 404 if no task has that id."""
-    task = next((task for task in tasks if task["id"] == task_id), None)
-    if task is None:
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
         return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
-    return task
+    return row_to_task(row)
 
 @app.post("/tasks", status_code=201)
 def create_task(task: dict):
