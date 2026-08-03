@@ -63,6 +63,16 @@ content-type: application/json
 
 I created a few tasks, restarted the server, and `GET /tasks` showed only the three seed tasks again — everything I had created was gone. That happens because the tasks live in a Python list in the process's memory, and memory is wiped when the process stops; a database exists to solve exactly this, which is what Week 3 is about.
 
+## SQL by hand (Week 3, Stage 4)
+
+With the API server still running, I executed this directly against `tasks.db`:
+
+```sql
+UPDATE tasks SET done = 1;
+```
+
+Immediately afterwards `GET /stats` went from `{"total":3,"done":1,"open":2}` to `{"total":3,"done":3,"open":0}` with no server restart — the API and the SQL tool are reading the exact same file, so there is one source of truth and nothing to "sync".
+
 ## Swagger UI
 
 Every endpoint is documented and testable in the browser at `/docs` — the full CRUD cycle works via "Try it out":
