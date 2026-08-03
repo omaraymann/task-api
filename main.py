@@ -90,25 +90,39 @@ def create_task(task: dict):
 @app.put("/tasks/{task_id}")
 def update_task(task_id: int, body: dict):
     """Update a task's title and/or done. 404 if the id is unknown, 400 if the body is empty or invalid."""
-    task = next((t for t in tasks if t["id"] == task_id), None)
-    if task is None:
-        return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
-    if "title" not in body and "done" not in body:
-        return JSONResponse(status_code=400, content={"error": "body must contain title and/or done"})
-    if "title" in body and (not isinstance(body["title"], str) or not body["title"].strip()):
-        return JSONResponse(status_code=400, content={"error": "title must be a non-empty string"})
-    if "done" in body and not isinstance(body["done"], bool):
-        return JSONResponse(status_code=400, content={"error": "done must be true or false"})
-    if "title" in body:
-        task["title"] = body["title"].strip()
-    if "done" in body:
-        task["done"] = body["done"]
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
+        if "title" not in body and "done" not in body:
+            return JSONResponse(status_code=400, content={"error": "body must contain title and/or done"})
+        if "title" in body and (not isinstance(body["title"], str) or not body["title"].strip()):
+            return JSONResponse(status_code=400, content={"error": "title must be a non-empty string"})
+        if "done" in body and not isinstance(body["done"], bool):
+            return JSONResponse(status_code=400, content={"error": "done must be true or false"})
+        task = row_to_task(row)
+        if "title" in body:
+            task["title"] = body["title"].strip()
+        if "done" in body:
+            task["done"] = body["done"]
+        with conn:  # transaction: write the merged task back to disk
+            conn.execute(
+                "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+                (task["title"], int(task["done"]), task_id),
+            )
+    finally:
+        conn.close()
     return task
 
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int):
     """Delete a task by id. Returns 204 with no body, or 404 if the id is unknown."""
-    task = next((t for t in tasks if t["id"] == task_id), None)
-    if task is None:
+    conn = get_connection()
+    try:
+        with conn:  # transaction: commit the delete
+            cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    finally:
+        conn.close()
+    if cursor.rowcount == 0:
         return JSONResponse(status_code=404, content={"error": f"Task {task_id} not found"})
-    tasks.remove(task)
