@@ -1,6 +1,16 @@
 # Task API
 
-A small to-do list CRUD API built with **FastAPI** for the FlyRank Internship — Backend Track, Week 2. You can create tasks, read them, update them, and delete them. Tasks live in an **in-memory list**: restarting the server resets the data to the three seed tasks. That is intentional — no database until Week 3.
+A small to-do list CRUD API built with **FastAPI** for the FlyRank Internship — Backend Track. Week 2 built the API with an in-memory list; in Week 3 the storage moved to a **SQLite database** (`tasks.db`), so tasks now survive a server restart. The endpoints, request/response shapes, and status codes did not change — only the storage layer underneath did.
+
+## Why SQLite?
+
+- **It's a single file** (`tasks.db`) — no database server to install, configure, or keep running.
+- **Zero setup for anyone cloning this repo** — the file and its `tasks` table are created automatically on first start, and three example tasks are seeded only when the table is empty.
+- **Real persistence** — data lives on disk, so it outlives the process. That's the entire upgrade from Week 2.
+
+The database file is created next to `db.py` and is **git-ignored**, so every fresh clone starts with its own clean database.
+
+All SQL uses **parameterized queries** (`?` placeholders) — user input is never glued into SQL strings.
 
 ## Install & run
 
@@ -59,9 +69,17 @@ content-type: application/json
 {"error":"Task 99 not found"}
 ```
 
-## The mortality experiment
+## The mortality experiment — and its sequel
 
-I created a few tasks, restarted the server, and `GET /tasks` showed only the three seed tasks again — everything I had created was gone. That happens because the tasks live in a Python list in the process's memory, and memory is wiped when the process stops; a database exists to solve exactly this, which is what Week 3 is about.
+**Week 2:** I created a few tasks, restarted the server, and `GET /tasks` showed only the three seed tasks again — everything I had created was gone. That happens because the tasks lived in a Python list in the process's memory, and memory is wiped when the process stops.
+
+**Week 3:** same experiment, opposite result. I created tasks, killed the server, started it again — and `GET /tasks` still returned them, because every task is now a row in `tasks.db` on disk. Restarting also does not duplicate the seed tasks: the seed only runs when the table is empty.
+
+## The database, seen directly
+
+The same rows the API serves, open in DB Browser for SQLite:
+
+![tasks.db in DB Browser](screenshots/dbbrowser.png)
 
 ## SQL by hand (Week 3, Stage 4)
 
