@@ -76,13 +76,16 @@ def create_task(task: dict):
     if not isinstance(title, str) or not title.strip():
         return JSONResponse(status_code=400, content={"error": "title is required and must be a non-empty string"})
 
-    new_task = {
-        "id": max((t["id"] for t in tasks), default=0) + 1,
-        "title": title.strip(),
-        "done": False,
-    }
-    tasks.append(new_task)
-    return new_task
+    conn = get_connection()
+    try:
+        with conn:  # transaction: the insert is committed to disk before we respond
+            cursor = conn.execute(
+                "INSERT INTO tasks (title, done) VALUES (?, ?)", (title.strip(), 0)
+            )
+        new_id = cursor.lastrowid
+    finally:
+        conn.close()
+    return {"id": new_id, "title": title.strip(), "done": False}
 
 @app.put("/tasks/{task_id}")
 def update_task(task_id: int, body: dict):
