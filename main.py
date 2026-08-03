@@ -1,19 +1,11 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from db import get_connection, init_db
+from db import SEED_TASKS, get_connection, init_db
 
 app = FastAPI(title="Task API", version="1.0")
 
 init_db()  # creates tasks.db and the tasks table on first run, seeds 3 tasks only when empty
-
-SEED_TASKS = [
-    {"id": 1, "title": "Learn FastAPI basics", "done": True},
-    {"id": 2, "title": "Build the CRUD endpoints", "done": False},
-    {"id": 3, "title": "Publish repo to GitHub", "done": False},
-]
-
-tasks = [dict(t) for t in SEED_TASKS]
 
 def row_to_task(row):
     """Convert a sqlite3.Row into the task dict the API has always returned (done as a real bool, not 0/1)."""
@@ -46,16 +38,28 @@ def get_tasks(done: bool | None = None, search: str | None = None):
 
 @app.get("/stats")
 def get_stats():
-    """Compute task counts: total, done, and open."""
-    done_count = sum(1 for t in tasks if t["done"])
-    return {"total": len(tasks), "done": done_count, "open": len(tasks) - done_count}
+    """Compute task counts with SQL: total, done, and open."""
+    conn = get_connection()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        done_count = conn.execute("SELECT COUNT(*) FROM tasks WHERE done = 1").fetchone()[0]
+    finally:
+        conn.close()
+    return {"total": total, "done": done_count, "open": total - done_count}
 
 @app.post("/reset")
 def reset_tasks():
     """Restore the three seed tasks. Handy for demos."""
-    tasks.clear()
-    tasks.extend(dict(t) for t in SEED_TASKS)
-    return tasks
+    conn = get_connection()
+    try:
+        with conn:  # transaction: wipe and re-seed all-or-nothing
+            conn.execute("DELETE FROM tasks")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name = 'tasks'")  # ids start from 1 again
+            conn.executemany("INSERT INTO tasks (title, done) VALUES (?, ?)", SEED_TASKS)
+        rows = conn.execute("SELECT * FROM tasks").fetchall()
+    finally:
+        conn.close()
+    return [row_to_task(r) for r in rows]
 
 @app.get("/tasks/{task_id}")
 def get_task(task_id: int):
